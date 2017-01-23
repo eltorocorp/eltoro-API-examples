@@ -133,7 +133,7 @@ def get_orderlines(org_list, hdrs):
     return camplist, ols, creatives
 
 # this runs the query for the detail stats for each option
-def stats_query(ids, headers):
+def stats_query(ids, hdrs):
     query = (
         '/stats?start=' +
         start +
@@ -148,70 +148,74 @@ def stats_query(ids, headers):
         '&creativeId=' + ids['creatives'] +
         '&disableCache=true'
     )
-    r = requests.get(BASE_URL + query+ "&disableCache=true", headers=headers).json()
-    return r
+    res = requests.get(BASE_URL + query+ "&disableCache=true", headers=hdrs).json()
+    return res
 
 # Parse arguments and verify some things, default others
-try:
+def login():
     try:
-        start = sys.argv[3]
-    except:
-        start = str(date.today() - timedelta(days=1))# + "%2007:00:00"
+        try:
+            start = sys.argv[3]
+        except:
+            start = str(date.today() - timedelta(days=1))# + "%2007:00:00"
+        try:
+            stop = sys.argv[4]
+        except:
+            stop = str(date.today() - timedelta(days=0))# + "%2006:59:59"
+        try:
+            granularity = sys.argv[5]
+        except:
+            granularity = "hour"
+        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it on the command line
+        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it on the command line
+
+    except IndexError:
+        print 'Usage:\n\n  python stats2csv <username> <password> <start (optional)> <end (optional)> <granularity (optional)> <org id (optional)>'
+        print ""
+        print "If dates or granularity are left off, it defaults to 'yesterday' (if run right now : "+ start +" thru  " + stop +") with a granularity timeframe of '"+granularity+"'"
+        print "username/password are required fields, unless you have hard coded them into this script"
+        print "-- This script should be in a cron/scheduled task to run daily at at least 2am PST, or 5am EST to ensure yesterday stats are updated --"
+        sys.exit()
+
     try:
-        stop = sys.argv[4]
-    except:
-        stop = str(date.today() - timedelta(days=0))# + "%2006:59:59"
+        org_id = sys.argv[6]
+    except IndexError:
+        org_id = 'not set'
+
+    #create output files
+    creative_csv = open('creative' + str(start) + '.csv', 'w')
+    orderLine_csv = open('orderLine' + str(start) + '.csv', 'w')
+    campaign_csv = open('campaign' + str(start) + '.csv', 'w')
+
+
+    ## Do all of the login stuff here
+
+    login = { 'email': user, 'password': passw }
+
+
+    login_resp = requests.post(BASE_URL + '/users/login', login)
+    #login_resp_local = requests.post('http://localhost:3000' + '/users/login', login)
+
     try:
-        granularity = sys.argv[5]
-    except:
-        granularity = "hour"
-    user = sys.argv[1]  # Hard Code username here if you do not wish to enter it on the command line
-    passw = sys.argv[2] # Hard Code password here if you do not wish to enter it on the command line
+        token = login_resp.json()[unicode('token')]
+    #    token_local = login_resp_local.json()[unicode('token')]
+        user_id = login_resp.json()[unicode('id')]
+    #    user_id_local = login_resp_local.json()[unicode('id')]
+    except KeyError:
+        print 'Login error, check your credentials\n'
+        print login_resp.text
+        sys.exit()
 
-except IndexError:
-    print 'Usage:\n\n  python stats2csv <username> <password> <start (optional)> <end (optional)> <granularity (optional)> <org id (optional)>'
-    print ""
-    print "If dates or granularity are left off, it defaults to 'yesterday' (if run right now : "+ start +" thru  " + stop +") with a granularity timeframe of '"+granularity+"'"
-    print "username/password are required fields, unless you have hard coded them into this script"
-    print "-- This script should be in a cron/scheduled task to run daily at at least 2am PST, or 5am EST to ensure yesterday stats are updated --"
-    sys.exit()
+    options = {
+        "start": start,
+        "stop": stop,
+        "granularity": granularity,
+    }
 
-try:
-    org_id = sys.argv[6]
-except IndexError:
-    org_id = 'not set'
-
-#create output files
-creative_csv = open('creative' + str(start) + '.csv', 'w')
-orderLine_csv = open('orderLine' + str(start) + '.csv', 'w')
-campaign_csv = open('campaign' + str(start) + '.csv', 'w')
-
-
-## Do all of the login stuff here
-
-login = { 'email': user, 'password': passw }
-
-
-login_resp = requests.post(BASE_URL + '/users/login', login)
-#login_resp_local = requests.post('http://localhost:3000' + '/users/login', login)
-
-try:
-    token = login_resp.json()[unicode('token')]
-#    token_local = login_resp_local.json()[unicode('token')]
-    user_id = login_resp.json()[unicode('id')]
-#    user_id_local = login_resp_local.json()[unicode('id')]
-except KeyError:
-    print 'Login error, check your credentials\n'
-    print login_resp.text
-    sys.exit()
-
-headers = {
-    "Authorization": ("Bearer " + str(token))
-}
-
-#headers_local = {
-#    "Authorization": ("Bearer " + str(token_local))
-#}
+    headers = {
+        "Authorization": ("Bearer " + str(token))
+    }
+    return headers, options
 
 ## Check valid login and org id
 if org_id == 'not set':
