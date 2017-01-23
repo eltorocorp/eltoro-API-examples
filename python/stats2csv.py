@@ -66,14 +66,14 @@ def get_campaigns(org_list, hdrs):
     return result
 
 ## This gets all of the orderline data, and preps the data for output - add additional fields here
-def get_orderLines(org_list):
+def get_orderlines(org_list, hdrs):
 
-    campaigns = get_campaigns(org_list)
+    campaigns = get_campaigns(org_list, hdrs)
 
     collection = "orderLines"
     ols = []
-    creatives=[]
-    camplist=[]
+    creatives = []
+    camplist = []
     suffix = '&pagingLimit=10'
     page = 1
     query = '/' + collection + "?" + suffix
@@ -87,64 +87,50 @@ def get_orderLines(org_list):
     allols = coll
     for camp in campaigns:
         thecamp = {
-                'campaignId':camp["_id"],
-                'orgId':camp["orgId"]
-                }
+            'campaignId':camp["_id"],
+            'orgId':camp["orgId"]
+            }
         camplist.append(thecamp)
 
-    for c in allols:
+    for obj in allols:
         for camp in campaigns:
-            if c["campaign"]["_id"] == camp["_id"]:
-                #print camp["_id"] + " has ol " + c["_id"] + " on it"
+            if obj["campaign"]["_id"] == camp["_id"]:
                 try:
-                    refId=c["refId"]
+                    ref_id = obj["refId"]
                 except:
-                    refId=""
-                    pass
+                    ref_id = ""
                 oldata = {
                     ##  CSV Field Header: Field to Populate it wit
-                        'orderLineId':c["_id"],
-                        'campaignId':c["campaignId"],
-                        'targetType':c["targetType"],
-                        'creativeType':c["creativeType"],
-                        'orderLineName':c["name"],
-                        'campaignName':c["campaign"]["name"],
-                        'refId':refId,
-                        'start':c["start"],
-                        'stop':c["stop"]
+                    'orderLineId':obj["_id"],
+                    'campaignId':obj["campaignId"],
+                    'targetType':obj["targetType"],
+                    'creativeType':obj["creativeType"],
+                    'orderLineName':obj["name"],
+                    'campaignName':obj["campaign"]["name"],
+                    'ref_id':ref_id,
+                    'start':obj["start"],
+                    'stop':obj["stop"]
                 }
                 ols.append(oldata)
-                olid=c["_id"]
-                for cre in c["creatives"]:
-                    try:
-                        size=cre["size"]
-                    except:
-                        size=0
-                        pass
-                    creative={
+                olid = obj["_id"]
+                for cre in obj["creatives"]:
+                    creative = {
+                        'creativeId':cre["_id"],
+                        'orderLineId':olid,
+                        'creativeName':cre["name"]
+                        }
+                    creatives.append(creative)
+                try:
+                    for cre in obj["creativesIdsDetached"]:
+                        creative = {
                             'creativeId':cre["_id"],
                             'orderLineId':olid,
                             'creativeName':cre["name"]
                             }
-                #    print creative
-                    creatives.append(creative)
-                try:
-                    for cre in c["creativesIdsDetached"]:
-                        try:
-                            size=cre["size"]
-                        except:
-                            size=0
-                            pass
-                        creative={
-                                'creativeId':cre["_id"],
-                                'orderLineId':olid,
-                                'creativeName':cre["name"]
-                                }
-                    #    print creative
                         creatives.append(creative)
                 except:
                     pass
-    return camplist,ols,creatives
+    return camplist, ols, creatives
 
 # this runs the query for the detail stats for each option
 def stats_query(ids, headers):
@@ -266,7 +252,7 @@ with open("apnxcompare.json") as json_data:
 orgs = get_orgs(org_id)
 ## now go get the data from the functions above
 #print "Getting data for the report"
-campaigns,ols,creatives = get_orderLines(orgs)
+campaigns,ols,creatives = get_orderlines(orgs)
 
 
 # meat an Potato's
