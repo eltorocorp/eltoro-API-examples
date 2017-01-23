@@ -12,8 +12,26 @@ import requests
 
 BASE_URL = 'https://api-prod.eltoro.com'
 
+#Used for making the csvs by names
+def open_files(start):
+    return {
+        'orderLines': {
+            'name': 'orderLines',
+            'file': open('orderLines' + str(start) + '.csv', 'w'),
+        },
+        'campaigns': {
+            'name': 'campaigns',
+            'file': open('campaigns' + str(start) + '.csv', 'w'),
+        },
+        'creatives': {
+            'name': 'creatives',
+            'file': open('creatives' + str(start) + '.csv', 'w'),
+            'denorm': 'orderLines',
+        },
+    }
+
 # Functions
-def get_orgs(org_id):
+def get_orgs(org_id, hdrs):
     """Get list of orgs for which stats will be received
 
     Args:
@@ -24,7 +42,7 @@ def get_orgs(org_id):
 
     """
     _orgs = [org_id]
-    orgs_resp = requests.get(BASE_URL + '/orgs', headers=headers)
+    orgs_resp = requests.get(BASE_URL + '/orgs', headers=hdrs)
     for org in orgs_resp.json()['results']:
         if org_id in org['parents']:
             _orgs.append(org['_id'])
@@ -77,12 +95,12 @@ def get_orderlines(org_list, hdrs):
     suffix = '&pagingLimit=10'
     page = 1
     query = '/' + collection + "?" + suffix
-    resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=headers).json()
+    resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
     coll = resp['results']
     paging = resp['paging']
     while paging['total'] > paging['limit'] * page:
         page += 1
-        resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=headers).json()
+        resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
         coll += resp['results']
     allols = coll
     for camp in campaigns:
@@ -164,8 +182,10 @@ def login():
             granularity = sys.argv[5]
         except:
             granularity = "hour"
-        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it on the command line
-        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it on the command line
+        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
+                            # on the command line
+        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it
+                            # on the command line
 
     except IndexError:
         print (
@@ -229,37 +249,11 @@ def login():
             sys.exit()
 
     #create output files
-    files = {
-        "creative_csv": open('creative' + str(start) + '.csv', 'w'),
-        "orderLine_csv": open('orderLine' + str(start) + '.csv', 'w'),
-        "campaign_csv": open('campaign' + str(start) + '.csv', 'w')
-        }
-
 
     ## Do all of the login stuff here
 
     return headers, options, files
 
-#Used for making the csvs by names
-indices = {
-    'orderLines': {
-        'name': 'orderLines',
-        'file': orderLine_csv,
-    },
-    'campaigns': {
-        'name': 'campaigns',
-        'file': campaign_csv,
-    },
-    'creatives': {
-        'name': 'creatives',
-        'file': creative_csv,
-        'denorm': 'orderLines',
-    },
-}
-import json
-with open("apnxcompare.json") as json_data:
-        tocompare=json.load(json_data)
-#tocompare=dict(tocompare)
 
 ## Get the org from the login that happened
 orgs = get_orgs(org_id)
