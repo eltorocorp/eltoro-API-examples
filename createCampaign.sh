@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage:
-# ./newApi.sh campaignName /location/of/file.csv
+# ./createCampaign.sh campaignName /location/of/file.csv
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
