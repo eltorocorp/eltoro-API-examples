@@ -133,16 +133,14 @@ def get_orderlines(org_list, hdrs):
     return camplist, ols, creatives
 
 # this runs the query for the detail stats for each option
-def stats_query(ids, hdrs):
+def stats_query(ids, hdrs, options):
     query = (
         '/stats?start=' +
-        start +
+        options["start"] +
         '&stop=' +
-        stop +
+        options["stop"] +
         '&granularity=' +
-        granularity+
-        #'&orgId=' +
-        #org_id +
+        options["granularity"] +
         '&campaignId=' + ids['campaigns'] +
         '&orderLineId=' + ids['orderLines'] +
         '&creativeId=' + ids['creatives'] +
@@ -170,11 +168,24 @@ def login():
         passw = sys.argv[2] # Hard Code password here if you do not wish to enter it on the command line
 
     except IndexError:
-        print 'Usage:\n\n  python stats2csv <username> <password> <start (optional)> <end (optional)> <granularity (optional)> <org id (optional)>'
+        print (
+            'Usage:\n\n  python stats2csv <username> <password> <start (optional)>' +
+            '<end (optional)> <granularity (optional)> <org id (optional)>'
+            )
         print ""
-        print "If dates or granularity are left off, it defaults to 'yesterday' (if run right now : "+ start +" thru  " + stop +") with a granularity timeframe of '"+granularity+"'"
-        print "username/password are required fields, unless you have hard coded them into this script"
-        print "-- This script should be in a cron/scheduled task to run daily at at least 2am PST, or 5am EST to ensure yesterday stats are updated --"
+        print (
+            "If dates or granularity are left off, it defaults to 'yesterday' (if" +
+            "run right now : "+ start +" thru  " + stop +") with a granularity timeframe " +
+            "of '" + granularity + "'"
+            )
+        print (
+            "username/password are required fields, unless you have hard coded them " +
+            "into this script"
+            )
+        print (
+            "-- This script should be in a cron/scheduled task to run daily at at least" +
+            "2am PST, or 5am EST to ensure yesterday stats are updated --"
+            )
         sys.exit()
 
     try:
@@ -182,25 +193,13 @@ def login():
     except IndexError:
         org_id = 'not set'
 
-    #create output files
-    creative_csv = open('creative' + str(start) + '.csv', 'w')
-    orderLine_csv = open('orderLine' + str(start) + '.csv', 'w')
-    campaign_csv = open('campaign' + str(start) + '.csv', 'w')
-
-
-    ## Do all of the login stuff here
-
     login = { 'email': user, 'password': passw }
 
-
     login_resp = requests.post(BASE_URL + '/users/login', login)
-    #login_resp_local = requests.post('http://localhost:3000' + '/users/login', login)
 
     try:
         token = login_resp.json()[unicode('token')]
-    #    token_local = login_resp_local.json()[unicode('token')]
-        user_id = login_resp.json()[unicode('id')]
-    #    user_id_local = login_resp_local.json()[unicode('id')]
+        user_id = login_resp.json()[unicode('userId')]
     except KeyError:
         print 'Login error, check your credentials\n'
         print login_resp.text
@@ -215,21 +214,31 @@ def login():
     headers = {
         "Authorization": ("Bearer " + str(token))
     }
-    return headers, options
+    ## Check valid login and org id
+    if org_id == 'not set':
+        user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)
+        try:
+            orgs = user_resp.json()[unicode('roles')].keys()
+        except:
+            print "Please provide an org id as the last argument"
+            sys.exit()
+        if len(orgs) == 1:
+            org_id = str(orgs[0])
+        else:
+            print "You belong to multiple orgs. Please provide an org id as the last argument"
+            sys.exit()
 
-## Check valid login and org id
-if org_id == 'not set':
-    user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)
-    try:
-        orgs = user_resp.json()[unicode('roles')].keys()
-    except:
-        print "Please provide an org id as the last argument"
-        sys.exit()
-    if len(orgs) == 1:
-        org_id = str(orgs[0])
-    else:
-        print "You belong to multiple orgs. Please provide an org id as the last argument"
-        sys.exit()
+    #create output files
+    files = {
+        "creative_csv": open('creative' + str(start) + '.csv', 'w'),
+        "orderLine_csv": open('orderLine' + str(start) + '.csv', 'w'),
+        "campaign_csv": open('campaign' + str(start) + '.csv', 'w')
+        }
+
+
+    ## Do all of the login stuff here
+
+    return headers, options, files
 
 #Used for making the csvs by names
 indices = {
