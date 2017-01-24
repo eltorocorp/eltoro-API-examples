@@ -241,7 +241,12 @@ def get_options():
     return options
 
 
-def login():
+def get_headers():
+    """Login and acquire an auth token
+
+    Returns:
+        dict: Header object with auth token
+    """
     try:
         user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
                             # on the command line
@@ -253,13 +258,12 @@ def login():
             "into this script"
             )
         sys.exit()
-
     try:
         org_id = sys.argv[6]
     except IndexError:
         org_id = 'not set'
 
-    login = { 'email': user, 'password': passw }
+    login = {'email': user, 'password': passw}
 
     login_resp = requests.post(BASE_URL + '/users/login', login)
 
@@ -270,12 +274,6 @@ def login():
         print 'Login error, check your credentials\n'
         print login_resp.text
         sys.exit()
-
-    options = {
-        "start": start,
-        "stop": stop,
-        "granularity": granularity,
-    }
 
     headers = {
         "Authorization": ("Bearer " + str(token))
@@ -294,11 +292,7 @@ def login():
             print "You belong to multiple orgs. Please provide an org id as the last argument"
             sys.exit()
 
-    #create output files
-
-    ## Do all of the login stuff here
-
-    return headers, options
+    return headers
 
 
 ## Get the org from the login that happened
@@ -417,22 +411,3 @@ for level in indices.keys():
                 ii=ii+1
                 val = ""
             i += 1
-    print "Total Clicks for "+ level +" : " + str(totalclicks)
-    if str(totalclicks) != str(tocompare["totals"][0]["clicks"]):
-        print "  ****************** DOES NOT MATCH ("+str(tocompare["totals"][0]["clicks"])+") ************************"
-    print "Total Imps for "+ level +" : " + str(totalimps)
-    if str(totalimps) != str(tocompare["totals"][0]["imps"]):
-        print "  ****************** DOES NOT MATCH ("+str(tocompare["totals"][0]["imps"])+") ************************"
-
-    if level == "creatives":
-        print "Totals by Hour for "+level+""
-        print "    Checks comparing each Hour also running..."
-        for hr in hour:
-            if str(tocompare["data"][hr]["imps"]) != str(hour[hr]['imps']):
-                print str(hr)+':Imps:' +str(hour[hr]['imps'])
-                print "  ****************** DOES NOT MATCH ("+str(tocompare["data"][hr]["imps"])+") ************************"
-            if str(tocompare["data"][hr]["clicks"]) != str(hour[hr]['clicks']):
-                print str(hr)+':Clicks:' +str(hour[hr]['clicks'])
-                "  ****************** DOES NOT MATCH ("+str(tocompare["data"][hr]["clicks"])+") ************************"
-print "Unless it shows 'DOES NOT MATCH' above, it actually matched the downloaded file"
-sysg.exit()
