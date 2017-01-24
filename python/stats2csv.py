@@ -14,6 +14,14 @@ BASE_URL = 'https://api-prod.eltoro.com'
 
 #Used for making the csvs by names
 def open_files(start):
+    """Open the csv files for writing and return a dict of file handles
+
+        Args:
+            start (str): The stringified start date for the stats run
+
+        Returns:
+            dict: File handles for csv output
+    """
     return {
         'orderLines': {
             'name': 'orderLines',
@@ -79,7 +87,7 @@ def get_campaigns(org_list, hdrs):
             try:
                 if obj['status'] == 20 or obj['status'] == 99 and obj["stop"] > recentdate:
                     result.append(obj)
-            except:
+            except StandardError:
                 pass
     return result
 
@@ -115,7 +123,7 @@ def get_orderlines(org_list, hdrs):
             if obj["campaign"]["_id"] == camp["_id"]:
                 try:
                     ref_id = obj["refId"]
-                except:
+                except StandardError:
                     ref_id = ""
                 oldata = {
                     ##  CSV Field Header: Field to Populate it wit
@@ -146,7 +154,7 @@ def get_orderlines(org_list, hdrs):
                             'creativeName':cre["name"]
                             }
                         creatives.append(creative)
-                except:
+                except StandardError:
                     pass
     return camplist, ols, creatives
 
@@ -172,15 +180,15 @@ def login():
     try:
         try:
             start = sys.argv[3]
-        except:
+        except StandardError:
             start = str(date.today() - timedelta(days=1))# + "%2007:00:00"
         try:
             stop = sys.argv[4]
-        except:
+        except StandardError:
             stop = str(date.today() - timedelta(days=0))# + "%2006:59:59"
         try:
             granularity = sys.argv[5]
-        except:
+        except StandardError:
             granularity = "hour"
         user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
                             # on the command line
@@ -239,7 +247,7 @@ def login():
         user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)
         try:
             orgs = user_resp.json()[unicode('roles')].keys()
-        except:
+        except StandardError:
             print "Please provide an org id as the last argument"
             sys.exit()
         if len(orgs) == 1:
@@ -252,7 +260,7 @@ def login():
 
     ## Do all of the login stuff here
 
-    return headers, options, files
+    return headers, options
 
 
 ## Get the org from the login that happened
@@ -361,7 +369,7 @@ for level in indices.keys():
                 try:
                     hour[ii]['imps']=hour[ii]['imps']+obs['imps']
                     hour[ii]['clicks']=hour[ii]['clicks']+obs['clicks']
-                except:
+                except StandardError:
                     hour[ii] = {}
                     hour[ii]['imps'] = 0
                     hour[ii]['clicks'] = 0
