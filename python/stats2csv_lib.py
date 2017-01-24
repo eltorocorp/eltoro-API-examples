@@ -52,7 +52,7 @@ def get_orgs(org_id, hdrs):
             _orgs.append(org['_id'])
     return _orgs
 
-def get_campaigns(org_list, hdrs):
+def _get_campaigns(org_list, hdrs):
     """Retrieves lists of objects for which we will return stats
 
     Args:
@@ -87,7 +87,7 @@ def get_campaigns(org_list, hdrs):
                 pass
     return result
 
-def ol_request(page, hdrs):
+def _ol_request(page, hdrs):
     """Returns a page of orderline results
 
     Args:
@@ -114,17 +114,17 @@ def get_orderlines(org_list, hdrs):
     Returns:
         list, list, list: Lists of campaign, order line and creative objects to query
     """
-    campaigns = get_campaigns(org_list, hdrs)
+    campaigns = _get_campaigns(org_list, hdrs)
 
     ols = []
     creatives = []
     camplist = []
     page = 1
-    resp = ol_request(page, hdrs)
+    resp = _ol_request(page, hdrs)
     coll = resp['results']
     while resp['paging']['total'] > resp['paging']['limit'] * page:
         page += 1
-        resp = ol_request(page, hdrs)
+        resp = _ol_request(page, hdrs)
         coll += resp['results']
     allols = resp['results']
     for camp in campaigns:
