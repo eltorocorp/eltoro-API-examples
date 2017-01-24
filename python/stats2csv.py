@@ -61,10 +61,10 @@ def get_campaigns(org_list, hdrs):
 
     Args:
         org_list (list): List of org ids
-        hdrs (dict): Authorization header for API
+        hdrs (dict): authorization header for api
 
     Returns:
-        list, list, list: Lists of campaign, order line and creative objects to query
+        list: List of campaign objects from which we will pull order line data
 
     """
     collection = "campaigns"
@@ -91,26 +91,46 @@ def get_campaigns(org_list, hdrs):
                 pass
     return result
 
-## This gets all of the orderline data, and preps the data for output - add additional fields here
-def get_orderlines(org_list, hdrs):
+def ol_request(page, hdrs):
+    """Returns a page of orderline results
 
+    Args:
+        page (int): Page of results to return
+        hdrs (dict): authorization header for api
+
+    Returns:
+        dict: JSON body of response
+
+    """
+    return requests.get((
+        BASE_URL + '/orderLines?pagingLimit=10' +
+        '&pagingPage=' +
+        str(page)
+        ), headers=hdrs).json()
+
+def get_orderlines(org_list, hdrs):
+    """Retrieves all order line data, and extracts the necessary campaign and creative data
+
+    Args:
+        org_list (list): List of ids for orgs to which the user belongs
+        hdrs (dict): authorization header for api
+
+    Returns:
+        list, list, list: Lists of campaign, order line and creative objects to query
+"""
     campaigns = get_campaigns(org_list, hdrs)
 
-    collection = "orderLines"
     ols = []
     creatives = []
     camplist = []
-    suffix = '&pagingLimit=10'
     page = 1
-    query = '/' + collection + "?" + suffix
-    resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
+    resp = ol_request(page, hdrs)
     coll = resp['results']
-    paging = resp['paging']
-    while paging['total'] > paging['limit'] * page:
+    while resp['paging']['total'] > resp['paging']['limit'] * page:
         page += 1
-        resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
+        resp = ol_request(page, hdrs)
         coll += resp['results']
-    allols = coll
+    allols = resp['results']
     for camp in campaigns:
         thecamp = {
             'campaignId':camp["_id"],
@@ -121,11 +141,9 @@ def get_orderlines(org_list, hdrs):
     for obj in allols:
         for camp in campaigns:
             if obj["campaign"]["_id"] == camp["_id"]:
-                try:
-                    ref_id = obj["refId"]
-                except StandardError:
-                    ref_id = ""
-                oldata = {
+                if 'refId' not in obj:
+                    obj["refId"] = ''
+                ols.append({
                     ##  CSV Field Header: Field to Populate it wit
                     'orderLineId':obj["_id"],
                     'campaignId':obj["campaignId"],
@@ -133,16 +151,14 @@ def get_orderlines(org_list, hdrs):
                     'creativeType':obj["creativeType"],
                     'orderLineName':obj["name"],
                     'campaignName':obj["campaign"]["name"],
-                    'ref_id':ref_id,
+                    'ref_id':obj["refId"],
                     'start':obj["start"],
                     'stop':obj["stop"]
-                }
-                ols.append(oldata)
-                olid = obj["_id"]
+                })
                 for cre in obj["creatives"]:
                     creative = {
                         'creativeId':cre["_id"],
-                        'orderLineId':olid,
+                        'orderLineId':obj["_id"],
                         'creativeName':cre["name"]
                         }
                     creatives.append(creative)
@@ -150,7 +166,7 @@ def get_orderlines(org_list, hdrs):
                     for cre in obj["creativesIdsDetached"]:
                         creative = {
                             'creativeId':cre["_id"],
-                            'orderLineId':olid,
+                            'orderLineId':obj["_id"],
                             'creativeName':cre["name"]
                             }
                         creatives.append(creative)
