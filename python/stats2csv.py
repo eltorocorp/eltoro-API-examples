@@ -117,7 +117,7 @@ def get_orderlines(org_list, hdrs):
 
     Returns:
         list, list, list: Lists of campaign, order line and creative objects to query
-"""
+    """
     campaigns = get_campaigns(org_list, hdrs)
 
     ols = []
@@ -162,7 +162,7 @@ def get_orderlines(org_list, hdrs):
                         'creativeName':cre["name"]
                         }
                     creatives.append(creative)
-                try:
+                if 'creativeIdsDetached' in obj:
                     for cre in obj["creativesIdsDetached"]:
                         creative = {
                             'creativeId':cre["_id"],
@@ -170,12 +170,21 @@ def get_orderlines(org_list, hdrs):
                             'creativeName':cre["name"]
                             }
                         creatives.append(creative)
-                except StandardError:
-                    pass
     return camplist, ols, creatives
 
 # this runs the query for the detail stats for each option
 def stats_query(ids, hdrs, options):
+    """Queries the stats API and returns a list of results
+
+    Args:
+        ids (dict): Dict of object ids to query
+        hdrs (dict): authorization header for api
+        options (dict): Query parameters to include with the request
+
+    Returns:
+        list: Stats broken down by (granularity)
+
+    """
     query = (
         '/stats?start=' +
         options["start"] +
@@ -192,24 +201,26 @@ def stats_query(ids, hdrs, options):
     return res
 
 # Parse arguments and verify some things, default others
-def login():
+def get_options():
+    """Parse time window and granularity agruments
+
+    Returns:
+        dict: User supplied or default start time, stop time, and granularity
+    """
+    options = {}
     try:
         try:
-            start = sys.argv[3]
+            options['start'] = sys.argv[3]
         except StandardError:
-            start = str(date.today() - timedelta(days=1))# + "%2007:00:00"
+            options['start'] = str(date.today() - timedelta(days=1))# + "%2007:00:00"
         try:
-            stop = sys.argv[4]
+            options['stop'] = sys.argv[4]
         except StandardError:
-            stop = str(date.today() - timedelta(days=0))# + "%2006:59:59"
+            options['stop'] = str(date.today() - timedelta(days=0))# + "%2006:59:59"
         try:
-            granularity = sys.argv[5]
+            options['granularity'] = sys.argv[5]
         except StandardError:
-            granularity = "hour"
-        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
-                            # on the command line
-        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it
-                            # on the command line
+            options['granularity'] = "hour"
 
     except IndexError:
         print (
@@ -219,16 +230,27 @@ def login():
         print ""
         print (
             "If dates or granularity are left off, it defaults to 'yesterday' (if" +
-            "run right now : "+ start +" thru  " + stop +") with a granularity timeframe " +
-            "of '" + granularity + "'"
-            )
-        print (
-            "username/password are required fields, unless you have hard coded them " +
-            "into this script"
+            "run right now : "+ options['start'] +" thru  " + options['stop'] +") with " +
+            "a granularity timeframe of '" + options['granularity'] + "'"
             )
         print (
             "-- This script should be in a cron/scheduled task to run daily at at least" +
             "2am PST, or 5am EST to ensure yesterday stats are updated --"
+            )
+        sys.exit()
+    return options
+
+
+def login():
+    try:
+        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
+                            # on the command line
+        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it
+                            # on the command line
+    except IndexError:
+        print (
+            "username/password are required fields, unless you have hard coded them " +
+            "into this script"
             )
         sys.exit()
 
