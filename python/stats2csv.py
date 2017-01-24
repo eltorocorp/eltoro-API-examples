@@ -6,314 +6,23 @@
     which the user has permissions.
 """
 
-import sys
-from datetime import date, timedelta
-import requests
+from stats2csv_lib import *
 
-BASE_URL = 'https://api-prod.eltoro.com'
+HEADERS, ORG_ID = get_headers()
+OPTIONS = get_options()
+FILES = open_files(OPTIONS['start'])
 
-#Used for making the csvs by names
-def open_files(start):
-    """Open the csv files for writing and return a dict of file handles
-
-        Args:
-            start (str): The stringified start date for the stats run
-
-        Returns:
-            dict: File handles for csv output
-    """
-    return {
-        'orderLines': {
-            'name': 'orderLines',
-            'file': open('orderLines' + str(start) + '.csv', 'w'),
-        },
-        'campaigns': {
-            'name': 'campaigns',
-            'file': open('campaigns' + str(start) + '.csv', 'w'),
-        },
-        'creatives': {
-            'name': 'creatives',
-            'file': open('creatives' + str(start) + '.csv', 'w'),
-            'denorm': 'orderLines',
-        },
-    }
-
-# Functions
-def get_orgs(org_id, hdrs):
-    """Get list of orgs for which stats will be received
-
-    Args:
-        org_id (str): Id of parent org
-
-    Returns:
-        list: List of org ids
-
-    """
-    _orgs = [org_id]
-    orgs_resp = requests.get(BASE_URL + '/orgs', headers=hdrs)
-    for org in orgs_resp.json()['results']:
-        if org_id in org['parents']:
-            _orgs.append(org['_id'])
-    return _orgs
-
-def get_campaigns(org_list, hdrs):
-    """Retrieves lists of objects for which we will return stats
-
-    Args:
-        org_list (list): List of org ids
-        hdrs (dict): authorization header for api
-
-    Returns:
-        list: List of campaign objects from which we will pull order line data
-
-    """
-    collection = "campaigns"
-    result = []
-    suffix = '&pagingLimit=10'
-    for org in org_list:
-        page = 1
-        query = '/' + collection + '?orgId=' + org + suffix
-        resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
-        coll = resp['results']
-        paging = resp['paging']
-        while paging['total'] > paging['limit'] * page:
-            page += 1
-            resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
-            coll += resp['results']
-
-        # This section
-        recentdate = date.today() - timedelta(days=7)
-        for obj in coll:
-            try:
-                if obj['status'] == 20 or obj['status'] == 99 and obj["stop"] > recentdate:
-                    result.append(obj)
-            except StandardError:
-                pass
-    return result
-
-def ol_request(page, hdrs):
-    """Returns a page of orderline results
-
-    Args:
-        page (int): Page of results to return
-        hdrs (dict): authorization header for api
-
-    Returns:
-        dict: JSON body of response
-
-    """
-    return requests.get((
-        BASE_URL + '/orderLines?pagingLimit=10' +
-        '&pagingPage=' +
-        str(page)
-        ), headers=hdrs).json()
-
-def get_orderlines(org_list, hdrs):
-    """Retrieves all order line data, and extracts the necessary campaign and creative data
-
-    Args:
-        org_list (list): List of ids for orgs to which the user belongs
-        hdrs (dict): authorization header for api
-
-    Returns:
-        list, list, list: Lists of campaign, order line and creative objects to query
-    """
-    campaigns = get_campaigns(org_list, hdrs)
-
-    ols = []
-    creatives = []
-    camplist = []
-    page = 1
-    resp = ol_request(page, hdrs)
-    coll = resp['results']
-    while resp['paging']['total'] > resp['paging']['limit'] * page:
-        page += 1
-        resp = ol_request(page, hdrs)
-        coll += resp['results']
-    allols = resp['results']
-    for camp in campaigns:
-        thecamp = {
-            'campaignId':camp["_id"],
-            'orgId':camp["orgId"]
-            }
-        camplist.append(thecamp)
-
-    for obj in allols:
-        for camp in campaigns:
-            if obj["campaign"]["_id"] == camp["_id"]:
-                if 'refId' not in obj:
-                    obj["refId"] = ''
-                ols.append({
-                    ##  CSV Field Header: Field to Populate it wit
-                    'orderLineId':obj["_id"],
-                    'campaignId':obj["campaignId"],
-                    'targetType':obj["targetType"],
-                    'creativeType':obj["creativeType"],
-                    'orderLineName':obj["name"],
-                    'campaignName':obj["campaign"]["name"],
-                    'ref_id':obj["refId"],
-                    'start':obj["start"],
-                    'stop':obj["stop"]
-                })
-                for cre in obj["creatives"]:
-                    creative = {
-                        'creativeId':cre["_id"],
-                        'orderLineId':obj["_id"],
-                        'creativeName':cre["name"]
-                        }
-                    creatives.append(creative)
-                if 'creativeIdsDetached' in obj:
-                    for cre in obj["creativesIdsDetached"]:
-                        creative = {
-                            'creativeId':cre["_id"],
-                            'orderLineId':obj["_id"],
-                            'creativeName':cre["name"]
-                            }
-                        creatives.append(creative)
-    return camplist, ols, creatives
-
-# this runs the query for the detail stats for each option
-def stats_query(ids, hdrs, options):
-    """Queries the stats API and returns a list of results
-
-    Args:
-        ids (dict): Dict of object ids to query
-        hdrs (dict): authorization header for api
-        options (dict): Query parameters to include with the request
-
-    Returns:
-        list: Stats broken down by (granularity)
-
-    """
-    query = (
-        '/stats?start=' +
-        options["start"] +
-        '&stop=' +
-        options["stop"] +
-        '&granularity=' +
-        options["granularity"] +
-        '&campaignId=' + ids['campaigns'] +
-        '&orderLineId=' + ids['orderLines'] +
-        '&creativeId=' + ids['creatives'] +
-        '&disableCache=true'
-    )
-    res = requests.get(BASE_URL + query+ "&disableCache=true", headers=hdrs).json()
-    return res
-
-# Parse arguments and verify some things, default others
-def get_options():
-    """Parse time window and granularity agruments
-
-    Returns:
-        dict: User supplied or default start time, stop time, and granularity
-    """
-    options = {}
-    try:
-        try:
-            options['start'] = sys.argv[3]
-        except StandardError:
-            options['start'] = str(date.today() - timedelta(days=1))# + "%2007:00:00"
-        try:
-            options['stop'] = sys.argv[4]
-        except StandardError:
-            options['stop'] = str(date.today() - timedelta(days=0))# + "%2006:59:59"
-        try:
-            options['granularity'] = sys.argv[5]
-        except StandardError:
-            options['granularity'] = "hour"
-
-    except IndexError:
-        print (
-            'Usage:\n\n  python stats2csv <username> <password> <start (optional)>' +
-            '<end (optional)> <granularity (optional)> <org id (optional)>'
-            )
-        print ""
-        print (
-            "If dates or granularity are left off, it defaults to 'yesterday' (if" +
-            "run right now : "+ options['start'] +" thru  " + options['stop'] +") with " +
-            "a granularity timeframe of '" + options['granularity'] + "'"
-            )
-        print (
-            "-- This script should be in a cron/scheduled task to run daily at at least" +
-            "2am PST, or 5am EST to ensure yesterday stats are updated --"
-            )
-        sys.exit()
-    return options
+ORGS = get_orgs(ORG_ID, HEADERS)
+CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS)
 
 
-def get_headers():
-    """Login and acquire an auth token
-
-    Returns:
-        dict: Header object with auth token
-    """
-    try:
-        user = sys.argv[1]  # Hard Code username here if you do not wish to enter it
-                            # on the command line
-        passw = sys.argv[2] # Hard Code password here if you do not wish to enter it
-                            # on the command line
-    except IndexError:
-        print (
-            "username/password are required fields, unless you have hard coded them " +
-            "into this script"
-            )
-        sys.exit()
-    try:
-        org_id = sys.argv[6]
-    except IndexError:
-        org_id = 'not set'
-
-    login = {'email': user, 'password': passw}
-
-    login_resp = requests.post(BASE_URL + '/users/login', login)
-
-    try:
-        token = login_resp.json()[unicode('token')]
-        user_id = login_resp.json()[unicode('userId')]
-    except KeyError:
-        print 'Login error, check your credentials\n'
-        print login_resp.text
-        sys.exit()
-
-    headers = {
-        "Authorization": ("Bearer " + str(token))
-    }
-    ## Check valid login and org id
-    if org_id == 'not set':
-        user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)
-        try:
-            orgs = user_resp.json()[unicode('roles')].keys()
-        except StandardError:
-            print "Please provide an org id as the last argument"
-            sys.exit()
-        if len(orgs) == 1:
-            org_id = str(orgs[0])
-        else:
-            print "You belong to multiple orgs. Please provide an org id as the last argument"
-            sys.exit()
-
-    return headers
-
-
-## Get the org from the login that happened
-orgs = get_orgs(org_id)
-## now go get the data from the functions above
-#print "Getting data for the report"
-campaigns,ols,creatives = get_orderlines(orgs)
-
-
-# meat an Potato's
-for level in indices.keys():
-#    print level + " running"
+for level in FILES:
     rows = []
-    ids={}
-    val = ""
+    ids = {}
     row1 = 'Date,Hour,Clicks,Imps,'
 
-    #Write a row for each collection belonging to each org
     if level == 'orderLines':
-        rows = ols
-        id = 'orderLineId'
+        rows = OLS
         row1 += 'orderLineId' + ','
         row1 += 'campaignId' + ','
         row1 += 'targetType' + ','
@@ -325,8 +34,7 @@ for level in indices.keys():
         row1 += 'stop'
 
     if level == 'creatives':
-        rows = creatives
-        id = 'creativeId'
+        rows = CREATIVES
         for row in rows:
             row1 += 'creativeId' + ','
             row1 += 'orderLineId' + ','
@@ -334,80 +42,68 @@ for level in indices.keys():
             break
 
     if level == 'campaigns':
-        rows = campaigns
-        id = 'campaignId'
+        rows = CAMPAIGNS
         for row in rows:
             row1 += "orgId" + ','
             row1 += 'campaignId'
             break
 
-#    print level + " Column headers: " + row1
-    indices[level]['file'].write(row1 + '\r\n')
+    FILES[level]['file'].write(row1 + '\r\n')
 
     print "Running Stats for " + level
-    totalclicks=0
-    totalimps=0
-    hour={}
+    totalclicks = 0
+    totalimps = 0
+    hour = {}
     for row in rows:
-
-        #ids = build_ids(level, row[id])
         if level == "campaigns":
-            ids['campaigns']=row["campaignId"]
-            ids['creatives']=""
-            ids['orderLines']=""
+            ids['campaigns'] = row["campaignId"]
+            ids['creatives'] = ""
+            ids['orderLines'] = ""
         if level == "orderLines":
-            ids['campaigns']=""
-            ids['creatives']=""
-            ids['orderLines']=row["orderLineId"]
+            ids['campaigns'] = ""
+            ids['creatives'] = ""
+            ids['orderLines'] = row["orderLineId"]
         if level == "creatives":
-            ids['campaigns']=""
-            ids['creatives']=row["creativeId"]
-            ids['orderLines']=row["orderLineId"]
+            ids['campaigns'] = ""
+            ids['creatives'] = row["creativeId"]
+            ids['orderLines'] = row["orderLineId"]
 
-        stats = stats_query(ids, headers)
-#        stats = stats_query_tmp(ids, headers)
-        i=0
-        ii=0
+        stats = stats_query(ids, HEADERS, OPTIONS)
+        i = 0
+        ii = 0
         for obs in stats:
-            #print obs
-            #
-            ## This is accounting for GMT->EST by getting two days worth and running on the proper window...
-            ## Raw Log data is in GMT
-            if i > 4 and i < 29:
-                indices[level]['file'].write(str(start) + ',')
-                indices[level]['file'].write(str(i - 5) + ',')
-                indices[level]['file'].write(str(obs['clicks']) + ',')
-                totalclicks = totalclicks + obs['clicks']
-                indices[level]['file'].write(str(obs['imps']) + ',')
-                totalimps = totalimps + obs['imps']
-                if level == "campaigns":
-                    indices[level]['file'].write(str(row['orgId']) + ',')
-                    indices[level]['file'].write(str(row['campaignId']))
-                if level == "orderLines":
-                    indices[level]['file'].write(str(row['orderLineId']) + ',')
-                    indices[level]['file'].write(str(row['campaignId']) + ',')
-                    indices[level]['file'].write(str(row['targetType']) + ',')
-                    indices[level]['file'].write(str(row['creativeType']) + ',')
-                    indices[level]['file'].write(str(row['orderLineName']) + ',')
-                    indices[level]['file'].write(str(row['campaignName']) + ',')
-                    indices[level]['file'].write(str(row['refId']) + ',')
-                    indices[level]['file'].write(str(row['start']) + ',')
-                    indices[level]['file'].write(str(row['stop']))
-                if level == "creatives":
-                    indices[level]['file'].write(str(row['creativeId']) + ',')
-                    indices[level]['file'].write(str(row['orderLineId']) + ',')
-                    indices[level]['file'].write(str(row['creativeName']))
-                indices[level]['file'].write('\r\n')
-                try:
-                    hour[ii]['imps']=hour[ii]['imps']+obs['imps']
-                    hour[ii]['clicks']=hour[ii]['clicks']+obs['clicks']
-                except StandardError:
-                    hour[ii] = {}
-                    hour[ii]['imps'] = 0
-                    hour[ii]['clicks'] = 0
-                    hour[ii]['imps']=hour[ii]['imps']+obs['imps']
-                    hour[ii]['clicks']=hour[ii]['clicks']+obs['clicks']
-                    pass
-                ii=ii+1
-                val = ""
-            i += 1
+            FILES[level]['file'].write(str(OPTIONS['start']) + ',')
+            FILES[level]['file'].write(str(i) + ',')
+            FILES[level]['file'].write(str(obs['clicks']) + ',')
+            totalclicks = totalclicks + obs['clicks']
+            FILES[level]['file'].write(str(obs['imps']) + ',')
+            totalimps = totalimps + obs['imps']
+            if level == "campaigns":
+                FILES[level]['file'].write(str(row['orgId']) + ',')
+                FILES[level]['file'].write(str(row['campaignId']))
+            if level == "orderLines":
+                FILES[level]['file'].write(str(row['orderLineId']) + ',')
+                FILES[level]['file'].write(str(row['campaignId']) + ',')
+                FILES[level]['file'].write(str(row['targetType']) + ',')
+                FILES[level]['file'].write(str(row['creativeType']) + ',')
+                FILES[level]['file'].write(str(row['orderLineName']) + ',')
+                FILES[level]['file'].write(str(row['campaignName']) + ',')
+                FILES[level]['file'].write(str(row['refId']) + ',')
+                FILES[level]['file'].write(str(row['start']) + ',')
+                FILES[level]['file'].write(str(row['stop']))
+            if level == "creatives":
+                FILES[level]['file'].write(str(row['creativeId']) + ',')
+                FILES[level]['file'].write(str(row['orderLineId']) + ',')
+                FILES[level]['file'].write(str(row['creativeName']))
+            FILES[level]['file'].write('\r\n')
+            try:
+                hour[ii]['imps'] = hour[ii]['imps']+obs['imps']
+                hour[ii]['clicks'] = hour[ii]['clicks']+obs['clicks']
+            except StandardError:
+                hour[ii] = {}
+                hour[ii]['imps'] = 0
+                hour[ii]['clicks'] = 0
+                hour[ii]['imps'] = hour[ii]['imps']+obs['imps']
+                hour[ii]['clicks'] = hour[ii]['clicks']+obs['clicks']
+            ii = ii+1
+        i += 1
