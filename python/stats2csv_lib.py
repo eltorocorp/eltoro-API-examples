@@ -265,7 +265,7 @@ def get_headers():
 
     try:
         token = login_resp.json()[unicode('token')]
-        user_id = login_resp.json()[unicode('userId')]
+        user_id = login_resp.json()[unicode('id')]
     except KeyError:
         print 'Login error, check your credentials\n'
         print login_resp.text
