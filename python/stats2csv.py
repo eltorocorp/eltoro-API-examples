@@ -20,11 +20,6 @@ ORGS = get_orgs(ORG_ID, HEADERS)
 print 'getting campaign data'
 CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS, OPTIONS)
 
-
-import json
-with open("apnxcompare.json") as json_data:
-        tocompare=json.load(json_data)
-
 for level in FILES:
     rows = []
     ids = {}
@@ -106,4 +101,3 @@ for level in FILES:
                     FILES[level]['file'].write(str(row['name']))
                 FILES[level]['file'].write('\r\n')
             i += 1
-
