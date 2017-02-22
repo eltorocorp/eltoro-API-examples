@@ -76,7 +76,7 @@ for level in FILES:
         ## Raw Log data is in GMT
         for obs in stats:
                 FILES[level]['file'].write(str(OPTIONS['start']) + ',')
-                FILES[level]['file'].write(str(i - 5) + ',')
+                FILES[level]['file'].write(str(i) + ',')
                 FILES[level]['file'].write(str(obs['clicks']) + ',')
                 totalclicks = totalclicks + obs['clicks']
                 FILES[level]['file'].write(str(obs['imps']) + ',')
