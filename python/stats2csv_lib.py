@@ -5,10 +5,11 @@
     which the user has permissions.
 """
 import sys
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import requests
 
 BASE_URL = 'https://api-prod.eltoro.com'
+REPORT_URL = 'https://api-prod.eltoro.com/stats/reportSearch'
 
 def open_files(start):
     """Open the csv files for writing and return a dict of file handles
@@ -52,7 +53,7 @@ def get_orgs(org_id, hdrs):
             _orgs.append(org['_id'])
     return _orgs
 
-def _get_campaigns(org_list, hdrs):
+def _get_campaigns(org_list, hdrs, options):
     """Retrieves lists of objects for which we will return stats
 
     Args:
@@ -63,48 +64,31 @@ def _get_campaigns(org_list, hdrs):
         list: List of campaign objects from which we will pull order line data
 
     """
-    collection = "campaigns"
     result = []
-    suffix = '&pagingLimit=10'
     for org in org_list:
-        page = 1
-        query = '/' + collection + '?orgId=' + org + suffix
-        resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
-        coll = resp['results']
-        paging = resp['paging']
-        while paging['total'] > paging['limit'] * page:
-            page += 1
-            resp = requests.get(BASE_URL + query + '&pagingPage=' + str(page), headers=hdrs).json()
-            coll += resp['results']
+        #page = 1
+        query = '?orgId=' + org + '&start=' + options['start'] + '&stop=' + options['stop'] #+ '&hasBeenDeployed=true'
+        print query
+        resp = requests.get(REPORT_URL+ query, headers=hdrs).json()
+        coll = resp['campaigns']
+        #paging = resp['paging']
+       # while paging['total'] > paging['limit'] * page:
+            #page += 1
+            #resp = requests.get(base_url + query + '&pagingPage=' + str(page), headers=headers).json()
+            #coll += resp['results']
 
-        # This section
-        recentdate = date.today() - timedelta(days=7)
-        for obj in coll:
-            try:
-                if obj['status'] == 20 or obj['status'] == 99 and obj["stop"] > recentdate:
-                    result.append(obj)
-            except StandardError:
-                pass
+        ## Filter for only active within last 7 days
+        recentdate = datetime.strptime(options['start'], '%Y-%m-%d').date() - timedelta(days=7)
+        for c in coll:
+            #try:
+                if datetime.strptime(c['start'], '%Y-%m-%dT%H:%M:%S.%fZ').date() > recentdate or datetime.strptime(c['stop'], '%Y-%m-%dT%H:%M:%S.%fZ').date()  > recentdate:
+                    c['orgId'] = org
+                    result.append(c)
+            #except:
+            #    pass
     return result
 
-def _ol_request(page, hdrs):
-    """Returns a page of orderline results
-
-    Args:
-        page (int): Page of results to return
-        hdrs (dict): authorization header for api
-
-    Returns:
-        dict: JSON body of response
-
-    """
-    return requests.get((
-        BASE_URL + '/orderLines?pagingLimit=10' +
-        '&pagingPage=' +
-        str(page)
-        ), headers=hdrs).json()
-
-def get_orderlines(org_list, hdrs):
+def get_orderlines(org_list, hdrs, options):
     """Retrieves all order line data, and extracts the necessary campaign and creative data
 
     Args:
@@ -114,59 +98,18 @@ def get_orderlines(org_list, hdrs):
     Returns:
         list, list, list: Lists of campaign, order line and creative objects to query
     """
-    campaigns = _get_campaigns(org_list, hdrs)
-
+    camps = _get_campaigns(org_list, hdrs, options)
     ols = []
     creatives = []
-    camplist = []
-    page = 1
-    resp = _ol_request(page, hdrs)
-    coll = resp['results']
-    while resp['paging']['total'] > resp['paging']['limit'] * page:
-        page += 1
-        resp = _ol_request(page, hdrs)
-        coll += resp['results']
-    allols = resp['results']
-    for camp in campaigns:
-        thecamp = {
-            'campaignId':camp["_id"],
-            'orgId':camp["orgId"]
-            }
-        camplist.append(thecamp)
-
-    for obj in allols:
-        for camp in campaigns:
-            if obj["campaign"]["_id"] == camp["_id"]:
-                if 'refId' not in obj:
-                    obj["refId"] = ''
-                ols.append({
-                    ##  CSV Field Header: Field to Populate it wit
-                    'orderLineId':obj["_id"],
-                    'campaignId':obj["campaignId"],
-                    'targetType':obj["targetType"],
-                    'creativeType':obj["creativeType"],
-                    'orderLineName':obj["name"],
-                    'campaignName':obj["campaign"]["name"],
-                    'ref_id':obj["refId"],
-                    'start':obj["start"],
-                    'stop':obj["stop"]
-                })
-                for cre in obj["creatives"]:
-                    creative = {
-                        'creativeId':cre["_id"],
-                        'orderLineId':obj["_id"],
-                        'creativeName':cre["name"]
-                        }
-                    creatives.append(creative)
-                if 'creativeIdsDetached' in obj:
-                    for cre in obj["creativesIdsDetached"]:
-                        creative = {
-                            'creativeId':cre["_id"],
-                            'orderLineId':obj["_id"],
-                            'creativeName':cre["name"]
-                            }
-                        creatives.append(creative)
-    return camplist, ols, creatives
+    for camp in camps:
+        for ol in camp[ 'orderLines' ]:
+            ol['campaignId'] = camp['_id']
+            ol['campaignName'] = camp['name']
+            ols.append(ol)
+            for cre in ol[ 'creatives' ]:
+                cre[ 'orderLineId' ] = ol[ '_id' ]
+                creatives.append(cre)
+    return camps,ols,creatives
 
 # this runs the query for the detail stats for each option
 def stats_query(ids, hdrs, options):
@@ -274,6 +217,8 @@ def get_headers():
     headers = {
         "Authorization": ("Bearer " + str(token))
     }
+
+    print headers
     ## Check valid login and org id
     if org_id == 'not set':
         user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)

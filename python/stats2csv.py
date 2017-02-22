@@ -8,13 +8,22 @@
 
 from stats2csv_lib import *
 
+print 'getting headers'
 HEADERS, ORG_ID = get_headers()
+print 'getting options'
 OPTIONS = get_options()
+print 'opening files'
 FILES = open_files(OPTIONS['start'])
 
+print 'getting orgs'
 ORGS = get_orgs(ORG_ID, HEADERS)
-CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS)
+print 'getting campaign data'
+CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS, OPTIONS)
 
+
+import json
+with open("apnxcompare.json") as json_data:
+        tocompare=json.load(json_data)
 
 for level in FILES:
     rows = []
@@ -53,57 +62,48 @@ for level in FILES:
     print "Running Stats for " + level
     totalclicks = 0
     totalimps = 0
-    hour = {}
     for row in rows:
         if level == "campaigns":
-            ids['campaigns'] = row["campaignId"]
+            ids['campaigns'] = row["_id"]
             ids['creatives'] = ""
             ids['orderLines'] = ""
         if level == "orderLines":
             ids['campaigns'] = ""
             ids['creatives'] = ""
-            ids['orderLines'] = row["orderLineId"]
+            ids['orderLines'] = row["_id"]
         if level == "creatives":
             ids['campaigns'] = ""
-            ids['creatives'] = row["creativeId"]
+            ids['creatives'] = row["_id"]
             ids['orderLines'] = row["orderLineId"]
 
         stats = stats_query(ids, HEADERS, OPTIONS)
         i = 0
-        ii = 0
+        ## This is accounting for GMT->EST by getting two days worth and running on the proper window...
+        ## Raw Log data is in GMT
         for obs in stats:
-            FILES[level]['file'].write(str(OPTIONS['start']) + ',')
-            FILES[level]['file'].write(str(i) + ',')
-            FILES[level]['file'].write(str(obs['clicks']) + ',')
-            totalclicks = totalclicks + obs['clicks']
-            FILES[level]['file'].write(str(obs['imps']) + ',')
-            totalimps = totalimps + obs['imps']
-            if level == "campaigns":
-                FILES[level]['file'].write(str(row['orgId']) + ',')
-                FILES[level]['file'].write(str(row['campaignId']))
-            if level == "orderLines":
-                FILES[level]['file'].write(str(row['orderLineId']) + ',')
-                FILES[level]['file'].write(str(row['campaignId']) + ',')
-                FILES[level]['file'].write(str(row['targetType']) + ',')
-                FILES[level]['file'].write(str(row['creativeType']) + ',')
-                FILES[level]['file'].write(str(row['orderLineName']) + ',')
-                FILES[level]['file'].write(str(row['campaignName']) + ',')
-                FILES[level]['file'].write(str(row['refId']) + ',')
-                FILES[level]['file'].write(str(row['start']) + ',')
-                FILES[level]['file'].write(str(row['stop']))
-            if level == "creatives":
-                FILES[level]['file'].write(str(row['creativeId']) + ',')
-                FILES[level]['file'].write(str(row['orderLineId']) + ',')
-                FILES[level]['file'].write(str(row['creativeName']))
-            FILES[level]['file'].write('\r\n')
-            try:
-                hour[ii]['imps'] = hour[ii]['imps']+obs['imps']
-                hour[ii]['clicks'] = hour[ii]['clicks']+obs['clicks']
-            except StandardError:
-                hour[ii] = {}
-                hour[ii]['imps'] = 0
-                hour[ii]['clicks'] = 0
-                hour[ii]['imps'] = hour[ii]['imps']+obs['imps']
-                hour[ii]['clicks'] = hour[ii]['clicks']+obs['clicks']
-            ii = ii+1
-        i += 1
+            if i > 4 and i < 29:
+                FILES[level]['file'].write(str(OPTIONS['start']) + ',')
+                FILES[level]['file'].write(str(i - 5) + ',')
+                FILES[level]['file'].write(str(obs['clicks']) + ',')
+                totalclicks = totalclicks + obs['clicks']
+                FILES[level]['file'].write(str(obs['imps']) + ',')
+                totalimps = totalimps + obs['imps']
+                if level == "campaigns":
+                    FILES[level]['file'].write(str(row['orgId']) + ',')
+                    FILES[level]['file'].write(str(row['_id']))
+                if level == "orderLines":
+                    FILES[level]['file'].write(str(row['_id']) + ',')
+                    FILES[level]['file'].write(str(row['campaignId']) + ',')
+                    FILES[level]['file'].write(str(row['targetType']) + ',')
+                    FILES[level]['file'].write(str(row['creativeType']) + ',')
+                    FILES[level]['file'].write(str(row['name']) + ',')
+                    FILES[level]['file'].write(str(row['campaignName']) + ',')
+                    FILES[level]['file'].write(str(row['start']) + ',')
+                    FILES[level]['file'].write(str(row['stop']))
+                if level == "creatives":
+                    FILES[level]['file'].write(str(row['_id']) + ',')
+                    FILES[level]['file'].write(str(row['orderLineId']) + ',')
+                    FILES[level]['file'].write(str(row['name']))
+                FILES[level]['file'].write('\r\n')
+            i += 1
+
