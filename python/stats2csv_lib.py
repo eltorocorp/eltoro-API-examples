@@ -66,29 +66,17 @@ def _get_campaigns(org_list, hdrs, options):
     """
     result = []
     for org in org_list:
-        #page = 1
         query = '?orgId=' + org + '&start=' + options['start'] + '&stop=' + options['stop'] #+ '&hasBeenDeployed=true'
-        print query
         resp = requests.get(REPORT_URL+ query, headers=hdrs).json()
         coll = resp['campaigns']
-        #paging = resp['paging']
-       # while paging['total'] > paging['limit'] * page:
-            #page += 1
-            #resp = requests.get(base_url + query + '&pagingPage=' + str(page), headers=headers).json()
-            #coll += resp['results']
-
-        ## Filter for only active within last 7 days
         recentdate = datetime.strptime(options['start'], '%Y-%m-%d').date() - timedelta(days=7)
         for c in coll:
-            #try:
-                if datetime.strptime(c['start'], '%Y-%m-%dT%H:%M:%S.%fZ').date() > recentdate or datetime.strptime(c['stop'], '%Y-%m-%dT%H:%M:%S.%fZ').date()  > recentdate:
-                    c['orgId'] = org
-                    result.append(c)
-            #except:
-            #    pass
+            if datetime.strptime(c['start'], '%Y-%m-%dT%H:%M:%S.%fZ').date() > recentdate or datetime.strptime(c['stop'], '%Y-%m-%dT%H:%M:%S.%fZ').date()  > recentdate:
+                c['orgId'] = org
+                result.append(c)
     return result
 
-def get_orderlines(org_list, hdrs, options):
+def get_object_data(org_list, hdrs, options):
     """Retrieves all order line data, and extracts the necessary campaign and creative data
 
     Args:
@@ -111,7 +99,6 @@ def get_orderlines(org_list, hdrs, options):
                 creatives.append(cre)
     return camps,ols,creatives
 
-# this runs the query for the detail stats for each option
 def stats_query(ids, hdrs, options):
     """Queries the stats API and returns a list of results
 
@@ -139,7 +126,6 @@ def stats_query(ids, hdrs, options):
     res = requests.get(BASE_URL + query+ "&disableCache=true", headers=hdrs).json()
     return res
 
-# Parse arguments and verify some things, default others
 def get_options():
     """Parse time window and granularity agruments
 
@@ -218,7 +204,6 @@ def get_headers():
         "Authorization": ("Bearer " + str(token))
     }
 
-    print headers
     ## Check valid login and org id
     if org_id == 'not set':
         user_resp = requests.get(BASE_URL + '/users/' + user_id, headers=headers)
@@ -230,7 +215,10 @@ def get_headers():
         if len(orgs) == 1:
             org_id = str(orgs[0])
         else:
-            print "You belong to multiple orgs. Please provide an org id as the last argument"
+            print "You belong to multiple orgs. Please provide one of the following org ids as the last argument."
+            print "Orgs to which you belong: "
+            print orgs
+            print "You belong to multiple orgs. Please provide one of the following org id as the last argument."
             sys.exit()
 
     return headers, org_id

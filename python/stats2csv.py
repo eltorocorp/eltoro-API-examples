@@ -18,7 +18,7 @@ FILES = open_files(OPTIONS['start'])
 print 'getting orgs'
 ORGS = get_orgs(ORG_ID, HEADERS)
 print 'getting campaign data'
-CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS, OPTIONS)
+CAMPAIGNS, OLS, CREATIVES = get_object_data(ORGS, HEADERS, OPTIONS)
 
 for level in FILES:
     rows = []

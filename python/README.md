@@ -66,14 +66,14 @@ Windows users can accomplish this typical usage by running the provided
 
 This script produces three CSV files with the following headers
 
-campaignYYYY-MM-DD.csv (YYYY-MM-DD matches the provided value for `start`)
+**campaignYYYY-MM-DD.csv** (YYYY-MM-DD matches the provided value for `start`)
 
 ```Date, Hour, Clicks, Imps, orgId, campaignId```
 
-orderLinesYYYY-MM-DD.csv
+**orderLinesYYYY-MM-DD.csv**
 
 ```Date, Hour, Clicks, Imps, orderLineId, campaignId, targetType, creativeType, orderLineName, campaignName, refId, start, stop```
 
-creativeYYYY-MM-DD.csv
+**creativeYYYY-MM-DD.csv**
 
 ```Date, Hour, Clicks, Imps, creativeId, orderLineId, creativeName```
