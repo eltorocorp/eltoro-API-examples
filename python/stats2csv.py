@@ -73,10 +73,8 @@ for level in FILES:
 
         stats = stats_query(ids, HEADERS, OPTIONS)
         i = 0
-        ## This is accounting for GMT->EST by getting two days worth and running on the proper window...
         ## Raw Log data is in GMT
         for obs in stats:
-            if i > 4 and i < 29:
                 FILES[level]['file'].write(str(OPTIONS['start']) + ',')
                 FILES[level]['file'].write(str(i - 5) + ',')
                 FILES[level]['file'].write(str(obs['clicks']) + ',')
@@ -100,4 +98,4 @@ for level in FILES:
                     FILES[level]['file'].write(str(row['orderLineId']) + ',')
                     FILES[level]['file'].write(str(row['name']))
                 FILES[level]['file'].write('\r\n')
-            i += 1
+                i += 1

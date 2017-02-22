@@ -141,7 +141,7 @@ def get_options():
         try:
             options['stop'] = sys.argv[4]
         except StandardError:
-            options['stop'] = str(date.today() - timedelta(days=0))# + "%2006:59:59"
+            options['stop'] = str(date.today() - timedelta(days=1))# + "%2006:59:59"
         try:
             options['granularity'] = sys.argv[5]
         except StandardError:
