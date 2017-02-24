@@ -11,7 +11,7 @@ const emailObj = {
 }
 
 // Body of request, See UsersAddSchema
-const data = {
+export const data = {
   registered_emails: [                        // required field
     emailObj,
   ],
@@ -25,7 +25,7 @@ const data = {
   username: 'APItestuser',
 }
 
-export const users_POST = (token, orgId) => {
+export const users_POST = (token, body) => {
   return new Promise((resolve, reject) => {
     rp({
       method: 'POST',
