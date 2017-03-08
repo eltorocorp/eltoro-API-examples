@@ -18,12 +18,7 @@ FILES = open_files(OPTIONS['start'])
 print 'getting orgs'
 ORGS = get_orgs(ORG_ID, HEADERS)
 print 'getting campaign data'
-CAMPAIGNS, OLS, CREATIVES = get_orderlines(ORGS, HEADERS, OPTIONS)
-
-
-import json
-with open("apnxcompare.json") as json_data:
-        tocompare=json.load(json_data)
+CAMPAIGNS, OLS, CREATIVES = get_object_data(ORGS, HEADERS, OPTIONS)
 
 for level in FILES:
     rows = []
@@ -78,12 +73,10 @@ for level in FILES:
 
         stats = stats_query(ids, HEADERS, OPTIONS)
         i = 0
-        ## This is accounting for GMT->EST by getting two days worth and running on the proper window...
         ## Raw Log data is in GMT
         for obs in stats:
-            if i > 4 and i < 29:
                 FILES[level]['file'].write(str(OPTIONS['start']) + ',')
-                FILES[level]['file'].write(str(i - 5) + ',')
+                FILES[level]['file'].write(str(i) + ',')
                 FILES[level]['file'].write(str(obs['clicks']) + ',')
                 totalclicks = totalclicks + obs['clicks']
                 FILES[level]['file'].write(str(obs['imps']) + ',')
@@ -105,5 +98,4 @@ for level in FILES:
                     FILES[level]['file'].write(str(row['orderLineId']) + ',')
                     FILES[level]['file'].write(str(row['name']))
                 FILES[level]['file'].write('\r\n')
-            i += 1
-
+                i += 1
