@@ -10,6 +10,7 @@
 import datetime
 import calendar
 import sys
+import base64
 import requests
 
 from get_downloadable_reports_lib import *
@@ -30,16 +31,24 @@ YEAR = NOW.year - 1 if MONTH == 12 else NOW.year
 MONTH_NAME = calendar.month_name[MONTH]
 MONTH_LAST = calendar.monthrange(YEAR, MONTH)[1]
 
+
 for org in ORGS:
     filename = org + '_' + MONTH_NAME + str(YEAR) + '.' + TYPE
     data = {
         "orgId": org,
-        "start": str(YEAR) + '-' + pad_month(MONTH) + '01',
-        "stop": str(YEAR) + '-' + pad_month(MONTH) + str(MONTH_LAST),
+        "start": str(YEAR) + '-' + pad_month(MONTH) + '-01',
+        "stop": str(YEAR) + '-' + pad_month(MONTH) + '-' + str(MONTH_LAST),
         "as": TYPE,
     }
-    r = requests.get(BASE_URL + '/stats/download', data=data, headers=HEADERS)
-    report = requests.utils.get_unicode_from_response(r)
-    with open('./' + filename, 'wb') as fout:
-        fout.write(base64.decodestring(report))
 
+    # Wrap the above data into a query string and make the API request
+    r = requests.get(BASE_URL + '/stats/download', params=data, headers=HEADERS)
+    report = r.text
+
+    # Common-sense check of the length to make sure we got a file and not an
+    # error message. Print the error message otherwise
+    if len(report) > 500:
+        with open('./' + filename, 'wb') as fout:
+            fout.write(base64.decodestring(report))
+    else:
+        print report

@@ -35,9 +35,9 @@ def get_headers():
         org_id = 'not set'
 
     login = {'email': user, 'password': passw}
-
+    print login
     login_resp = requests.post(BASE_URL + '/users/login', login)
-
+    print login_resp.json()
     try:
         token = login_resp.json()[unicode('token')]
         user_id = login_resp.json()[unicode('id')]
