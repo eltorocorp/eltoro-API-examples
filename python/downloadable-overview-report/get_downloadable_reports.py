@@ -46,7 +46,11 @@ for org in ORGS:
     report = r.text
 
     # Common-sense check of the length to make sure we got a file and not an
-    # error message. Print the error message otherwise
+    # error message.
+    #
+    # If we recieve an error, we print it to the console
+    #
+    # If we recieve a file, it is decoded from base64 encoding and written to the working directory
     if len(report) > 500:
         with open('./' + filename, 'wb') as fout:
             fout.write(base64.decodestring(report))
