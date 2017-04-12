@@ -6,6 +6,6 @@ access.
 
 ## Usage
 
-```python get_downloadable_reports <email> <password> <html|pdf|csv>```
+```python get_downloadable_reports.py <email> <password> <html|pdf|csv>```
 
 
