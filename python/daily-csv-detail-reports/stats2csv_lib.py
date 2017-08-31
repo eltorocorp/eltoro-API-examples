@@ -94,9 +94,10 @@ def get_object_data(org_list, hdrs, options):
             ol['campaignId'] = camp['_id']
             ol['campaignName'] = camp['name']
             ols.append(ol)
-            for cre in ol[ 'creatives' ]:
-                cre[ 'orderLineId' ] = ol[ '_id' ]
-                creatives.append(cre)
+            if 'creatives' in ol:
+                for cre in ol[ 'creatives' ]:
+                    cre[ 'orderLineId' ] = ol[ '_id' ]
+                    creatives.append(cre)
     return camps,ols,creatives
 
 def stats_query(ids, hdrs, options):
