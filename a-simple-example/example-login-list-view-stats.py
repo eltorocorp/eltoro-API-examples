@@ -15,7 +15,7 @@ import datetime
 import calendar
 import sys
 
-USERNAME="__your__user__"
+USERNAME="__your__user__" # <-- usually your email
 PASSWORD="__your__pass__"
 
 DOMAIN="https://api-sandbox.eltoro.com/"  # Dev / Sandbox
@@ -37,7 +37,7 @@ def mock_curl_output(response):
     data = response.json()
     if 'token' in data:
         if REDACTTOKEN:
-            data[unicode('token')] = 'xxxxxxxx'
+            data['token'] = 'xxxxxxxx'
     return json.dumps(data)
 
 print('')
@@ -48,24 +48,28 @@ print('')
 # it's a bit slow to login every time - better to maintain a login TOKEN
 # we send an expiration with it, or you can try/catch for
 #   { "error": 401, "reason": "Requires Auth" }
+#
+# NOTE most accounts use an email for their username
+#   if you are not using an email, you may need to submit a "username" and "password"
 # ---------------------------------------
 print('')
 print("### LOGIN to get a token")
 URL=DOMAIN + "users/login"
-mock_curl_cmd = Template("curl -X POST -H \"Content-Type: application/json\" -d '{\"username\": \"$USERNAME\", \"password\": \"xxxxxx\"}' '$URL'")
+mock_curl_cmd = Template("curl -X POST -H \"Content-Type: application/json\" -d '{\"email\": \"$USERNAME\", \"password\": \"xxxxxx\"}' '$URL'")
+
 print("$ " + mock_curl_cmd.substitute(dict(USERNAME=USERNAME, URL=URL)))
-payload = "{\"username\": \"developerstemp\", \"password\": \"eltororocks\"}"
+payload = json.dumps(dict(email=USERNAME, password=PASSWORD))
 headers = { 'content-type': "application/json" };
 response = requests.request("POST", URL, data=payload, headers=headers)
 print(mock_curl_output(response))
 print('')
 # ok - get from the response the token and user_id
 try:
-    TOKEN = response.json()[unicode('token')]
-    USERID = response.json()[unicode('id')]
+    TOKEN = response.json()['token']
+    USERID = response.json()['id']
 except KeyError:
-    print 'Login error, check your credentials\n'
-    print response.text
+    print('Login error, check your credentials\n')
+    print(response.text)
     sys.exit()
 
 # all other requests use the same headers
@@ -90,10 +94,10 @@ print('')
 if CAMPAIGNID == "":
     # ok - get the top campaign ID
     try:
-        CAMPAIGNID = response.json()['results'][0][unicode('_id')]
+        CAMPAIGNID = response.json()['results'][0]['_id']
     except KeyError:
-        print 'FAIL - unable to parse CAMPAIGNID (do you have any campaigns?)\n'
-        print response.text
+        print('FAIL - unable to parse CAMPAIGNID (do you have any campaigns?)\n')
+        print(response.text)
         sys.exit()
 
 
@@ -111,10 +115,10 @@ print('')
 if ORDERLINEID == "":
     # ok - get the top order line ID
     try:
-        ORDERLINEID = response.json()['orderLines'][0][unicode('_id')]
+        ORDERLINEID = response.json()['orderLines'][0]['_id']
     except KeyError:
-        print 'FAIL - unable to parse ORDERLINEID (did the campaign have some?)\n'
-        print response.text
+        print('FAIL - unable to parse ORDERLINEID (did the campaign have some?)\n')
+        print(response.text)
         sys.exit()
 
 # ---------------------------------------
