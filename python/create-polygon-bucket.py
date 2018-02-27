@@ -16,14 +16,15 @@ import datetime
 import calendar
 import sys
 
-USERNAME="__your__user__" # <-- usually your email
-PASSWORD="__your__pass__"
+USERNAME="__your username__" # <-- usually your email
+PASSWORD="__your password___"
 
 DOMAIN = "https://api-sandbox.eltoro.com/"  # Dev / Sandbox
 # DOMAIN="https://api-prod.eltoro.com/"   # Prod
 REDACTTOKEN = True    # True will replace token in your console
 
 BUCKET_DATA = {
+    "orgId": "__your org id__",
     "type": 21,
     "name": "Example polygon bucket from API",
     #  "tags": ["indinaola", "my_references"],
